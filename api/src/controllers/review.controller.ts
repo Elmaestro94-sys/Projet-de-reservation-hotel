@@ -77,3 +77,56 @@ export async function getPropertyReviews(req: Request, res: Response) {
   });
   return success(res, reviews);
 }
+
+export async function reportReview(req: Request, res: Response) {
+  const { id } = req.params;
+  const review = await prisma.review.findUnique({ where: { id } });
+  if (!review) return error(res, 'Avis introuvable', 404);
+
+  await prisma.review.update({ where: { id }, data: { isReported: true } });
+  await logAudit({ userId: req.user!.id, action: 'UPDATE', entity: 'Review', entityId: id, reason: 'Signalement', req });
+  return success(res, { message: 'Avis signalé. Notre équipe va l\'examiner.' });
+}
+
+export async function adminListReportedReviews(req: Request, res: Response) {
+  const { page = '1', limit = '20' } = req.query as Record<string, string>;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const [reviews, total] = await Promise.all([
+    prisma.review.findMany({
+      where: { isReported: true },
+      skip,
+      take: parseInt(limit),
+      orderBy: { createdAt: 'desc' },
+      include: {
+        reviewer: { select: { firstName: true, lastName: true, email: true } },
+        property: { select: { title: true, slug: true } },
+      },
+    }),
+    prisma.review.count({ where: { isReported: true } }),
+  ]);
+
+  const { paginated } = await import('../utils/response');
+  return paginated(res, reviews, total, parseInt(page), parseInt(limit));
+}
+
+export async function adminUnpublishReview(req: Request, res: Response) {
+  const { id } = req.params;
+  await prisma.review.update({ where: { id }, data: { isPublished: false, isReported: false } });
+
+  const review = await prisma.review.findUnique({ where: { id } });
+  if (review) {
+    const stats = await prisma.review.aggregate({
+      where: { propertyId: review.propertyId, isPublished: true },
+      _avg: { rating: true },
+      _count: { id: true },
+    });
+    await prisma.property.update({
+      where: { id: review.propertyId },
+      data: { avgRating: stats._avg.rating || 0, reviewCount: stats._count.id },
+    });
+  }
+
+  await logAudit({ userId: req.user!.id, action: 'UPDATE', entity: 'Review', entityId: id, req });
+  return success(res, { message: 'Avis masqué.' });
+}

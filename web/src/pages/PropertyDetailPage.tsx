@@ -1,13 +1,25 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { Helmet } from 'react-helmet-async';
 import {
   Star, MapPin, Users, Bed, Bath, Wifi, Car, Wind, Waves, ChevronLeft,
   Heart, Share2, BadgeCheck, Zap, ChevronRight, X, Calendar
 } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { propertyApi, bookingApi, paymentApi } from '@/services/api';
 import { useAuthStore } from '@/store/auth.store';
 import toast from 'react-hot-toast';
+
+// Fix default Leaflet marker icon
+delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
 
 const AMENITY_ICONS: Record<string, React.ReactNode> = {
   wifi: <Wifi className="w-4 h-4" />,
@@ -100,6 +112,15 @@ export default function PropertyDetailPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <Helmet>
+        <title>{property.title} – {property.city} | Séjour Sénégal</title>
+        <meta name="description" content={`${property.description?.slice(0, 155)}…`} />
+        <meta property="og:title" content={`${property.title} – ${property.city}`} />
+        <meta property="og:description" content={property.description?.slice(0, 155)} />
+        {photos[0]?.url && <meta property="og:image" content={photos[0].url} />}
+        <link rel="canonical" href={`/logements/${slug}`} />
+      </Helmet>
+
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-gray-500 mb-4">
         <button onClick={() => navigate(-1)} className="flex items-center gap-1 hover:text-gray-700">
@@ -223,6 +244,36 @@ export default function PropertyDetailPage() {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* Map */}
+          {property.latitude && property.longitude && (
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Emplacement</h2>
+              <div className="rounded-2xl overflow-hidden h-64 border border-gray-200">
+                <MapContainer
+                  center={[property.latitude, property.longitude]}
+                  zoom={14}
+                  style={{ height: '100%', width: '100%' }}
+                  scrollWheelZoom={false}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker position={[property.latitude, property.longitude]}>
+                    <Popup>
+                      <strong>{property.title}</strong><br />
+                      {property.city}{property.district ? `, ${property.district}` : ''}
+                    </Popup>
+                  </Marker>
+                </MapContainer>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                <MapPin className="w-3.5 h-3.5 inline mr-1" />
+                {property.address}, {property.city}
+              </p>
             </div>
           )}
 

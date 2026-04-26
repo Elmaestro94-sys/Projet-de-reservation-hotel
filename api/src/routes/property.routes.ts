@@ -7,6 +7,8 @@ const router = Router();
 router.get('/', optionalAuth, propertyController.listProperties);
 router.get('/my', authenticate, authorize('OWNER', 'SUPER_ADMIN'), propertyController.getOwnerProperties);
 router.get('/my/stats', authenticate, authorize('OWNER', 'SUPER_ADMIN'), propertyController.getOwnerStats);
+router.get('/my/stats/revenue', authenticate, authorize('OWNER', 'SUPER_ADMIN'), propertyController.getOwnerRevenueStats);
+router.get('/my/export', authenticate, authorize('OWNER', 'SUPER_ADMIN'), propertyController.exportOwnerBookingsCSV);
 router.get('/favorites', authenticate, propertyController.getFavorites);
 router.get('/:slug', optionalAuth, propertyController.getProperty);
 router.post('/', authenticate, authorize('OWNER', 'SUPER_ADMIN'), propertyController.createProperty);

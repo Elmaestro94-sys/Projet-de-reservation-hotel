@@ -197,6 +197,100 @@ export async function getOwnerStats(req: Request, res: Response) {
   });
 }
 
+export async function getOwnerRevenueStats(req: Request, res: Response) {
+  const ownerId = req.user!.id;
+  const { year = String(new Date().getFullYear()) } = req.query as Record<string, string>;
+
+  const bookings = await prisma.booking.findMany({
+    where: {
+      property: { ownerId },
+      status: { in: ['CONFIRMED', 'COMPLETED'] },
+      checkIn: {
+        gte: new Date(`${year}-01-01`),
+        lte: new Date(`${year}-12-31`),
+      },
+    },
+    select: { checkIn: true, ownerAmount: true, totalAmount: true, commissionAmount: true, nights: true },
+  });
+
+  const monthly = Array.from({ length: 12 }, (_, i) => ({
+    month: i + 1,
+    label: new Date(2000, i).toLocaleString('fr-FR', { month: 'short' }),
+    revenue: 0,
+    commissions: 0,
+    bookings: 0,
+    nights: 0,
+  }));
+
+  for (const b of bookings) {
+    const m = new Date(b.checkIn).getMonth();
+    monthly[m].revenue += b.ownerAmount;
+    monthly[m].commissions += b.commissionAmount;
+    monthly[m].bookings += 1;
+    monthly[m].nights += b.nights;
+  }
+
+  return success(res, { year: parseInt(year), monthly });
+}
+
+export async function exportOwnerBookingsCSV(req: Request, res: Response) {
+  const ownerId = req.user!.id;
+  const { status, from, to } = req.query as Record<string, string>;
+
+  const where: Record<string, unknown> = { property: { ownerId } };
+  if (status) where.status = status;
+  if (from || to) {
+    where.checkIn = {
+      ...(from && { gte: new Date(from) }),
+      ...(to && { lte: new Date(to) }),
+    };
+  }
+
+  const bookings = await prisma.booking.findMany({
+    where,
+    orderBy: { checkIn: 'desc' },
+    include: {
+      user: { select: { firstName: true, lastName: true, email: true, phone: true } },
+      property: { select: { title: true, city: true } },
+      payments: { select: { status: true, provider: true, paidAt: true } },
+    },
+  });
+
+  const header = [
+    'ID', 'Statut', 'Voyageur', 'Email', 'Téléphone', 'Logement', 'Ville',
+    'Arrivée', 'Départ', 'Nuits', 'Voyageurs', 'Total (XOF)', 'Votre part (XOF)',
+    'Commission (XOF)', 'Paiement', 'Fournisseur', 'Payé le',
+  ].join(';');
+
+  const rows = bookings.map(b => {
+    const payment = b.payments[0];
+    return [
+      b.id,
+      b.status,
+      `${b.user.firstName} ${b.user.lastName}`,
+      b.user.email,
+      b.user.phone || '',
+      b.property.title,
+      b.property.city,
+      new Date(b.checkIn).toLocaleDateString('fr-FR'),
+      new Date(b.checkOut).toLocaleDateString('fr-FR'),
+      b.nights,
+      b.guests,
+      b.totalAmount,
+      b.ownerAmount,
+      b.commissionAmount,
+      payment?.status || '',
+      payment?.provider || '',
+      payment?.paidAt ? new Date(payment.paidAt).toLocaleDateString('fr-FR') : '',
+    ].join(';');
+  });
+
+  const csv = [header, ...rows].join('\n');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="reservations-${Date.now()}.csv"`);
+  res.send('﻿' + csv); // BOM for Excel
+}
+
 export async function manageAvailability(req: Request, res: Response) {
   const { propertyId } = req.params;
   const { dates, isBlocked, price } = req.body;

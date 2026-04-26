@@ -42,12 +42,16 @@ api.interceptors.response.use(
 export const authApi = {
   register: (data: object) => api.post('/auth/register', data),
   login: (data: object) => api.post('/auth/login', data),
+  loginWith2FA: (data: object) => api.post('/auth/login/2fa', data),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   updateProfile: (data: object) => api.put('/auth/profile', data),
   changePassword: (data: object) => api.put('/auth/change-password', data),
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
   resetPassword: (data: object) => api.post('/auth/reset-password', data),
+  setup2FA: () => api.post('/auth/2fa/setup'),
+  verify2FA: (token: string) => api.post('/auth/2fa/verify', { token }),
+  disable2FA: (token: string) => api.post('/auth/2fa/disable', { token }),
 };
 
 // Properties
@@ -60,6 +64,8 @@ export const propertyApi = {
   delete: (id: string) => api.delete(`/properties/${id}`),
   myProperties: () => api.get('/properties/my'),
   myStats: () => api.get('/properties/my/stats'),
+  myRevenueStats: (year?: number) => api.get('/properties/my/stats/revenue', { params: year ? { year } : {} }),
+  exportBookings: (params?: object) => api.get('/properties/my/export', { params, responseType: 'blob' }),
   toggleFavorite: (id: string) => api.post(`/properties/${id}/favorite`),
   favorites: () => api.get('/properties/favorites'),
   manageAvailability: (propertyId: string, data: object) => api.put(`/properties/${propertyId}/availability`, data),
@@ -95,7 +101,17 @@ export const paymentApi = {
 export const reviewApi = {
   create: (data: object) => api.post('/reviews', data),
   reply: (id: string, reply: string) => api.post(`/reviews/${id}/reply`, { reply }),
+  report: (id: string) => api.post(`/reviews/${id}/report`),
   byProperty: (propertyId: string) => api.get(`/reviews/property/${propertyId}`),
+};
+
+// Promotions
+export const promotionApi = {
+  list: (propertyId?: string) => api.get('/promotions', { params: propertyId ? { propertyId } : {} }),
+  create: (data: object) => api.post('/promotions', data),
+  update: (id: string, data: object) => api.put(`/promotions/${id}`, data),
+  delete: (id: string) => api.delete(`/promotions/${id}`),
+  validate: (data: object) => api.post('/promotions/validate', data),
 };
 
 // Messages

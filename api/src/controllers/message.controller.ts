@@ -80,3 +80,45 @@ export async function deleteMessage(req: Request, res: Response) {
   await prisma.message.update({ where: { id }, data: { status: 'DELETED' } });
   return success(res, { message: 'Message supprimé.' });
 }
+
+export async function reportMessage(req: Request, res: Response) {
+  const { id } = req.params;
+  const userId = req.user!.id;
+
+  const message = await prisma.message.findUnique({ where: { id } });
+  if (!message) return error(res, 'Message introuvable', 404);
+  if (message.receiverId !== userId && message.senderId !== userId) {
+    return error(res, 'Accès refusé', 403);
+  }
+
+  await prisma.message.update({ where: { id }, data: { isReported: true } });
+  return success(res, { message: 'Message signalé. Notre équipe va l\'examiner.' });
+}
+
+export async function adminListReportedMessages(req: Request, res: Response) {
+  const { page = '1', limit = '20' } = req.query as Record<string, string>;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const [messages, total] = await Promise.all([
+    prisma.message.findMany({
+      where: { isReported: true },
+      skip,
+      take: parseInt(limit),
+      orderBy: { createdAt: 'desc' },
+      include: {
+        sender: { select: { firstName: true, lastName: true, email: true } },
+        receiver: { select: { firstName: true, lastName: true, email: true } },
+      },
+    }),
+    prisma.message.count({ where: { isReported: true } }),
+  ]);
+
+  const { paginated } = await import('../utils/response');
+  return paginated(res, messages, total, parseInt(page), parseInt(limit));
+}
+
+export async function adminDeleteMessage(req: Request, res: Response) {
+  const { id } = req.params;
+  await prisma.message.update({ where: { id }, data: { status: 'DELETED', isReported: false } });
+  return success(res, { message: 'Message supprimé par l\'administration.' });
+}

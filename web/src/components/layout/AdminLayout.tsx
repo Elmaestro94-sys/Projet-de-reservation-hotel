@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Building2, Calendar, CreditCard, LogOut, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Users, Building2, Calendar, CreditCard, LogOut, ChevronRight, Shield, Flag } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 
 const navItems = [
@@ -8,6 +8,8 @@ const navItems = [
   { to: '/admin/annonces', icon: Building2, label: 'Annonces' },
   { to: '/admin/reservations', icon: Calendar, label: 'Réservations' },
   { to: '/admin/paiements', icon: CreditCard, label: 'Paiements' },
+  { to: '/admin/moderation', icon: Flag, label: 'Modération' },
+  { to: '/admin/audit', icon: Shield, label: 'Audit' },
 ];
 
 export default function AdminLayout() {

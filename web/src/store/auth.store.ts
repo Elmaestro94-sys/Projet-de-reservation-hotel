@@ -9,6 +9,7 @@ interface User {
   role: string;
   avatar?: string;
   isVerified: boolean;
+  twoFactorEnabled?: boolean;
 }
 
 interface AuthState {

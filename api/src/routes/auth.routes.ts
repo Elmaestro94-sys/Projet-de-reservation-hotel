@@ -22,11 +22,15 @@ const loginSchema = z.object({
 
 router.post('/register', validate(registerSchema), authController.register);
 router.post('/login', validate(loginSchema), authController.login);
+router.post('/login/2fa', authController.loginWith2FA);
 router.post('/refresh', authController.refreshToken);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
 router.get('/me', authenticate, authController.getMe);
 router.put('/profile', authenticate, authController.updateProfile);
 router.put('/change-password', authenticate, authController.changePassword);
+router.post('/2fa/setup', authenticate, authController.setup2FA);
+router.post('/2fa/verify', authenticate, authController.verify2FA);
+router.post('/2fa/disable', authenticate, authController.disable2FA);
 
 export default router;

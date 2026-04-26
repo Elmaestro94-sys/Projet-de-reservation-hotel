@@ -225,3 +225,73 @@ export async function getAuditLogs(req: Request, res: Response) {
 
   return paginated(res, logs, total, parseInt(page), parseInt(limit));
 }
+
+export async function listReportedReviews(req: Request, res: Response) {
+  const { page = '1', limit = '20' } = req.query as Record<string, string>;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const [reviews, total] = await Promise.all([
+    prisma.review.findMany({
+      where: { isReported: true },
+      skip,
+      take: parseInt(limit),
+      orderBy: { createdAt: 'desc' },
+      include: {
+        reviewer: { select: { firstName: true, lastName: true, email: true } },
+        property: { select: { title: true, slug: true } },
+      },
+    }),
+    prisma.review.count({ where: { isReported: true } }),
+  ]);
+
+  return paginated(res, reviews, total, parseInt(page), parseInt(limit));
+}
+
+export async function unpublishReview(req: Request, res: Response) {
+  const { id } = req.params;
+  const review = await prisma.review.findUnique({ where: { id } });
+  if (!review) return error(res, 'Avis introuvable', 404);
+
+  await prisma.review.update({ where: { id }, data: { isPublished: false, isReported: false } });
+
+  const stats = await prisma.review.aggregate({
+    where: { propertyId: review.propertyId, isPublished: true },
+    _avg: { rating: true },
+    _count: { id: true },
+  });
+  await prisma.property.update({
+    where: { id: review.propertyId },
+    data: { avgRating: stats._avg.rating || 0, reviewCount: stats._count.id },
+  });
+
+  await logAudit({ userId: req.user!.id, action: 'UPDATE', entity: 'Review', entityId: id, req });
+  return success(res, { message: 'Avis masqué.' });
+}
+
+export async function listReportedMessages(req: Request, res: Response) {
+  const { page = '1', limit = '20' } = req.query as Record<string, string>;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  const [messages, total] = await Promise.all([
+    prisma.message.findMany({
+      where: { isReported: true },
+      skip,
+      take: parseInt(limit),
+      orderBy: { createdAt: 'desc' },
+      include: {
+        sender: { select: { firstName: true, lastName: true, email: true } },
+        receiver: { select: { firstName: true, lastName: true, email: true } },
+      },
+    }),
+    prisma.message.count({ where: { isReported: true } }),
+  ]);
+
+  return paginated(res, messages, total, parseInt(page), parseInt(limit));
+}
+
+export async function deleteReportedMessage(req: Request, res: Response) {
+  const { id } = req.params;
+  await prisma.message.update({ where: { id }, data: { status: 'DELETED', isReported: false } });
+  await logAudit({ userId: req.user!.id, action: 'DELETE', entity: 'Message', entityId: id, req });
+  return success(res, { message: 'Message supprimé.' });
+}

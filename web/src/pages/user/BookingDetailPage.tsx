@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Calendar, Users, CreditCard, Star, MessageSquare, X, CheckCircle } from 'lucide-react';
+import { MapPin, Calendar, Users, CreditCard, Star, MessageSquare, X, CheckCircle, FileText } from 'lucide-react';
 import { bookingApi, reviewApi, paymentApi } from '@/services/api';
 import { useAuthStore } from '@/store/auth.store';
 import { format } from 'date-fns';
@@ -80,17 +80,22 @@ export default function BookingDetailPage() {
             Créée le {format(new Date(booking.createdAt), 'd MMMM yyyy', { locale: fr })}
           </p>
         </div>
-        <span className={`badge text-sm px-3 py-1.5 ${
-          booking.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' :
-          booking.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-          booking.status === 'COMPLETED' ? 'bg-gray-100 text-gray-600' :
-          'bg-red-100 text-red-700'
-        }`}>
-          {booking.status === 'CONFIRMED' && <CheckCircle className="w-4 h-4" />}
-          {booking.status === 'CONFIRMED' ? 'Confirmée' :
-           booking.status === 'PENDING' ? 'En attente de paiement' :
-           booking.status === 'COMPLETED' ? 'Terminée' : 'Annulée'}
-        </span>
+        <div className="flex items-center gap-2">
+          <Link to={`/mes-reservations/${id}/recu`} className="btn-secondary flex items-center gap-2 text-sm">
+            <FileText className="w-4 h-4" /> Voir le reçu
+          </Link>
+          <span className={`badge text-sm px-3 py-1.5 ${
+            booking.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' :
+            booking.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+            booking.status === 'COMPLETED' ? 'bg-gray-100 text-gray-600' :
+            'bg-red-100 text-red-700'
+          }`}>
+            {booking.status === 'CONFIRMED' && <CheckCircle className="w-4 h-4" />}
+            {booking.status === 'CONFIRMED' ? 'Confirmée' :
+             booking.status === 'PENDING' ? 'En attente de paiement' :
+             booking.status === 'COMPLETED' ? 'Terminée' : 'Annulée'}
+          </span>
+        </div>
       </div>
 
       {/* Property summary */}

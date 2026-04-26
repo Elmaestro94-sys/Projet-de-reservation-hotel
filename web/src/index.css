@@ -48,3 +48,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .leaflet-container {
   border-radius: 0.75rem;
 }
+
+/* Print styles for receipt */
+@media print {
+  .print\:hidden { display: none !important; }
+  body { background: white; }
+  nav, header, footer, aside { display: none !important; }
+  #receipt { border: none !important; box-shadow: none !important; }
+}

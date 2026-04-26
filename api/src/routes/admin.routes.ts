@@ -19,5 +19,9 @@ router.post('/properties/:id/reject', authorize('SUPER_ADMIN', 'MODERATOR'), adm
 router.get('/bookings', adminController.listBookings);
 router.get('/payments', authorize('SUPER_ADMIN', 'FINANCE'), adminController.listPayments);
 router.get('/audit-logs', authorize('SUPER_ADMIN'), adminController.getAuditLogs);
+router.get('/reported-reviews', authorize('SUPER_ADMIN', 'MODERATOR'), adminController.listReportedReviews);
+router.post('/reviews/:id/unpublish', authorize('SUPER_ADMIN', 'MODERATOR'), adminController.unpublishReview);
+router.get('/reported-messages', authorize('SUPER_ADMIN', 'MODERATOR', 'SUPPORT'), adminController.listReportedMessages);
+router.delete('/messages/:id', authorize('SUPER_ADMIN', 'MODERATOR'), adminController.deleteReportedMessage);
 
 export default router;

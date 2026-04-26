@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import speakeasy from 'speakeasy';
+import QRCode from 'qrcode';
 import prisma from '../utils/prisma';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { success, error } from '../utils/response';
@@ -158,4 +160,99 @@ export async function changePassword(req: Request, res: Response) {
   await logAudit({ userId: user.id, action: 'UPDATE', entity: 'User', entityId: user.id, req });
 
   return success(res, { message: 'Mot de passe modifié avec succès.' });
+}
+
+export async function setup2FA(req: Request, res: Response) {
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+  if (!user) return error(res, 'Utilisateur introuvable', 404);
+  if (user.twoFactorEnabled) return error(res, '2FA déjà activé', 400);
+
+  const secret = speakeasy.generateSecret({
+    name: `Séjour Sénégal (${user.email})`,
+    issuer: 'SejourSenegal',
+    length: 20,
+  });
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { twoFactorSecret: secret.base32 },
+  });
+
+  const qrDataUrl = await QRCode.toDataURL(secret.otpauth_url!);
+  return success(res, { secret: secret.base32, qrCode: qrDataUrl });
+}
+
+export async function verify2FA(req: Request, res: Response) {
+  const { token } = req.body;
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+  if (!user || !user.twoFactorSecret) return error(res, 'Secret 2FA non configuré', 400);
+
+  const valid = speakeasy.totp.verify({
+    secret: user.twoFactorSecret,
+    encoding: 'base32',
+    token,
+    window: 2,
+  });
+
+  if (!valid) return error(res, 'Code 2FA invalide', 400);
+
+  await prisma.user.update({ where: { id: user.id }, data: { twoFactorEnabled: true } });
+  await logAudit({ userId: user.id, action: 'VERIFY', entity: 'User', entityId: user.id, req });
+
+  return success(res, { message: '2FA activé avec succès.' });
+}
+
+export async function disable2FA(req: Request, res: Response) {
+  const { token } = req.body;
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+  if (!user || !user.twoFactorSecret) return error(res, 'Secret 2FA non configuré', 400);
+
+  const valid = speakeasy.totp.verify({
+    secret: user.twoFactorSecret,
+    encoding: 'base32',
+    token,
+    window: 2,
+  });
+  if (!valid) return error(res, 'Code 2FA invalide', 400);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { twoFactorEnabled: false, twoFactorSecret: null },
+  });
+  await logAudit({ userId: user.id, action: 'UPDATE', entity: 'User', entityId: user.id, req });
+
+  return success(res, { message: '2FA désactivé.' });
+}
+
+export async function loginWith2FA(req: Request, res: Response) {
+  const { email, password, token } = req.body;
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || user.isBanned) return error(res, 'Email ou mot de passe incorrect', 401);
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) return error(res, 'Email ou mot de passe incorrect', 401);
+
+  if (!user.isActive) return error(res, 'Compte désactivé. Contactez le support.', 403);
+
+  if (user.twoFactorEnabled) {
+    if (!token) return success(res, { requiresTwoFactor: true }, 200);
+
+    const totpValid = speakeasy.totp.verify({
+      secret: user.twoFactorSecret!,
+      encoding: 'base32',
+      token,
+      window: 2,
+    });
+    if (!totpValid) return error(res, 'Code 2FA invalide', 401);
+  }
+
+  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+  await logAudit({ userId: user.id, action: 'LOGIN', entity: 'User', entityId: user.id, req });
+
+  const accessToken = signAccessToken({ id: user.id, email: user.email, role: user.role });
+  const refreshToken = signRefreshToken({ id: user.id });
+
+  const { passwordHash: _, twoFactorSecret: __, ...safeUser } = user;
+  return success(res, { user: safeUser, accessToken, refreshToken });
 }

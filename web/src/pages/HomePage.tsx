@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Search, MapPin, Calendar, Users, Star, Shield, Headphones, ChevronRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { destinationApi, propertyApi } from '@/services/api';
@@ -33,6 +34,14 @@ export default function HomePage() {
 
   return (
     <div>
+      <Helmet>
+        <title>Séjour Sénégal – Locations premium au Sénégal</title>
+        <meta name="description" content="Réservez des logements d'exception au Sénégal : villas, appartements et maisons à Dakar, Saly, Saint-Louis. Paiement sécurisé, annonces vérifiées." />
+        <meta property="og:title" content="Séjour Sénégal – Locations premium au Sénégal" />
+        <meta property="og:description" content="Découvrez les meilleurs logements au Sénégal pour vos vacances ou déplacements." />
+        <link rel="canonical" href="/" />
+      </Helmet>
+
       {/* Hero */}
       <section className="relative min-h-[600px] flex items-center">
         <div
@@ -125,9 +134,9 @@ export default function HomePage() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {DESTINATIONS.map(dest => (
-            <button
+            <Link
               key={dest.name}
-              onClick={() => navigate(`/recherche?city=${dest.name}`)}
+              to={`/destinations/${dest.name.toLowerCase().replace(/\s+/g, '-')}`}
               className="group relative rounded-2xl overflow-hidden aspect-[3/4] cursor-pointer"
             >
               <img src={dest.image} alt={dest.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -136,7 +145,7 @@ export default function HomePage() {
                 <p className="font-bold text-lg">{dest.name}</p>
                 <p className="text-sm text-gray-300">{dest.count} logements</p>
               </div>
-            </button>
+            </Link>
           ))}
         </div>
       </section>

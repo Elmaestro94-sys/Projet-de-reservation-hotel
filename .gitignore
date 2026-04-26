@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.production
+*.log
+npm-debug.log*
+.DS_Store
+uploads/
+*.pid
+.pnp.*
+coverage/
+.nyc_output/
+*.tsbuildinfo

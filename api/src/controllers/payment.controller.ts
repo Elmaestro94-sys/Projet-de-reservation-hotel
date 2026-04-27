@@ -5,6 +5,7 @@ import prisma from '../utils/prisma';
 import { success, error } from '../utils/response';
 import { logAudit } from '../utils/audit';
 import { sendBookingConfirmationEmail } from '../utils/email';
+import { notify } from '../utils/notify';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-04-10' as Stripe.LatestApiVersion });
 
@@ -119,6 +120,16 @@ export async function stripeWebhook(req: Request, res: Response) {
       } catch { /* email failure must not block */ }
     }
 
+    if (booking) {
+      await notify(
+        booking.userId,
+        'PAYMENT_RECEIVED',
+        'Paiement reçu',
+        `Votre paiement pour "${booking.property.title}" a été enregistré.`,
+        { bookingId: bookingId, amount: payment.amount },
+      );
+    }
+
     await logAudit({ action: 'PAYMENT', entity: 'Payment', entityId: payment.id, newValue: { status: 'PAID' } });
   }
 
@@ -200,7 +211,24 @@ export async function createPayTechSession(req: Request, res: Response) {
 }
 
 export async function paytechWebhook(req: Request, res: Response) {
-  const { ref_command, type_event } = req.body;
+  // Verify PayTech signature: SHA256(API_KEY + API_SECRET + ref_command)
+  const apiKey = process.env.PAYTECH_API_KEY || '';
+  const apiSecret = process.env.PAYTECH_API_SECRET || '';
+  const { ref_command, type_event, payment_method } = req.body;
+
+  if (!ref_command) return res.status(400).json({ error: 'ref_command manquant' });
+
+  const crypto = await import('crypto');
+  const expectedHash = crypto
+    .createHash('sha256')
+    .update(apiKey + apiSecret + ref_command)
+    .digest('hex');
+
+  const receivedHash = req.headers['x-paytech-hash'] as string | undefined;
+
+  if (receivedHash && receivedHash !== expectedHash) {
+    return res.status(400).json({ error: 'Signature PayTech invalide' });
+  }
 
   if (type_event === 'sale_complete') {
     const payment = await prisma.payment.findUnique({ where: { idempotencyKey: ref_command } });
@@ -211,7 +239,7 @@ export async function paytechWebhook(req: Request, res: Response) {
     await prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { idempotencyKey: ref_command },
-        data: { status: 'PAID', paidAt: new Date() },
+        data: { status: 'PAID', paidAt: new Date(), metadata: payment_method ? { payment_method } : undefined },
       });
       await tx.booking.update({
         where: { id: payment.bookingId },
@@ -219,7 +247,15 @@ export async function paytechWebhook(req: Request, res: Response) {
       });
     });
 
-    await logAudit({ action: 'PAYMENT', entity: 'Payment', entityId: payment.id, newValue: { status: 'PAID' } });
+    await notify(
+      payment.userId,
+      'PAYMENT_RECEIVED',
+      'Paiement reçu',
+      `Votre paiement via PayTech a été enregistré.`,
+      { bookingId: payment.bookingId, amount: payment.amount },
+    );
+
+    await logAudit({ action: 'PAYMENT', entity: 'Payment', entityId: payment.id, newValue: { status: 'PAID', provider: 'PAYTECH' } });
   }
 
   if (type_event === 'sale_canceled') {
@@ -246,4 +282,56 @@ export async function getUserPayments(req: Request, res: Response) {
     orderBy: { createdAt: 'desc' },
   });
   return success(res, payments);
+}
+
+export async function refundPayment(req: Request, res: Response) {
+  const { id } = req.params;
+  const { amount, reason } = req.body;
+
+  const payment = await prisma.payment.findUnique({
+    where: { id },
+    include: { booking: { select: { id: true, totalAmount: true } } },
+  });
+
+  if (!payment) return error(res, 'Paiement introuvable', 404);
+  if (payment.status !== 'PAID') return error(res, 'Seul un paiement réglé peut être remboursé', 400);
+
+  const refundAmount = amount ? parseFloat(amount) : payment.amount;
+  if (refundAmount > payment.amount) return error(res, 'Montant de remboursement supérieur au paiement', 400);
+
+  if (payment.provider === 'STRIPE' && payment.providerReference) {
+    try {
+      const refund = await stripe.refunds.create({
+        payment_intent: payment.providerReference,
+        amount: Math.round(refundAmount),
+        reason: 'requested_by_customer',
+      });
+      await prisma.payment.update({
+        where: { id },
+        data: {
+          status: refundAmount === payment.amount ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+          refundAmount,
+          refundedAt: new Date(),
+          metadata: { ...(payment.metadata as object || {}), refundId: refund.id, refundReason: reason },
+        },
+      });
+    } catch (e: unknown) {
+      const msg = (e as { message?: string })?.message || 'Erreur Stripe';
+      return error(res, `Remboursement Stripe échoué: ${msg}`, 500);
+    }
+  } else {
+    // Manual/PayTech refund: record for manual processing
+    await prisma.payment.update({
+      where: { id },
+      data: {
+        status: refundAmount === payment.amount ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+        refundAmount,
+        refundedAt: new Date(),
+        metadata: { ...(payment.metadata as object || {}), refundReason: reason, manualRefund: true },
+      },
+    });
+  }
+
+  await logAudit({ userId: req.user!.id, action: 'PAYMENT', entity: 'Payment', entityId: id, reason, req });
+  return success(res, { message: `Remboursement de ${refundAmount.toLocaleString('fr-SN')} XOF effectué.` });
 }

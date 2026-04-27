@@ -1,10 +1,17 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { rateLimit } from 'express-rate-limit';
 import * as authController from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 
 const router = Router();
+
+const passwordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { error: 'Trop de tentatives. Réessayez dans 1 heure.' },
+});
 
 const registerSchema = z.object({
   email: z.string().email('Email invalide'),
@@ -24,8 +31,10 @@ router.post('/register', validate(registerSchema), authController.register);
 router.post('/login', validate(loginSchema), authController.login);
 router.post('/login/2fa', authController.loginWith2FA);
 router.post('/refresh', authController.refreshToken);
-router.post('/forgot-password', authController.forgotPassword);
-router.post('/reset-password', authController.resetPassword);
+router.post('/verify-email', authController.verifyEmail);
+router.post('/resend-verification', authenticate, authController.resendVerification);
+router.post('/forgot-password', passwordLimiter, authController.forgotPassword);
+router.post('/reset-password', passwordLimiter, authController.resetPassword);
 router.get('/me', authenticate, authController.getMe);
 router.put('/profile', authenticate, authController.updateProfile);
 router.put('/change-password', authenticate, authController.changePassword);

@@ -19,8 +19,9 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) return cb(null, true);
+    if (allowed.includes(ext) && allowedMimes.includes(file.mimetype)) return cb(null, true);
     cb(new Error('Format non supporté. Utilisez JPG, PNG ou WebP.'));
   },
 });

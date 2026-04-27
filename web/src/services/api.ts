@@ -49,6 +49,8 @@ export const authApi = {
   changePassword: (data: object) => api.put('/auth/change-password', data),
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
   resetPassword: (data: object) => api.post('/auth/reset-password', data),
+  verifyEmail: (token: string) => api.post('/auth/verify-email', { token }),
+  resendVerification: () => api.post('/auth/resend-verification'),
   setup2FA: () => api.post('/auth/2fa/setup'),
   verify2FA: (token: string) => api.post('/auth/2fa/verify', { token }),
   disable2FA: (token: string) => api.post('/auth/2fa/disable', { token }),
@@ -88,6 +90,7 @@ export const bookingApi = {
   get: (id: string) => api.get(`/bookings/${id}`),
   confirm: (id: string) => api.post(`/bookings/${id}/confirm`),
   cancel: (id: string, reason?: string) => api.post(`/bookings/${id}/cancel`, { reason }),
+  createDispute: (id: string, reason: string) => api.post(`/bookings/${id}/dispute`, { reason }),
 };
 
 // Payments
@@ -95,6 +98,7 @@ export const paymentApi = {
   createStripeSession: (bookingId: string) => api.post('/payments/stripe/create-session', { bookingId }),
   createPaytechSession: (bookingId: string) => api.post('/payments/paytech/create-session', { bookingId }),
   myPayments: () => api.get('/payments/my'),
+  refund: (id: string, data: object) => api.post(`/payments/${id}/refund`, data),
 };
 
 // Reviews

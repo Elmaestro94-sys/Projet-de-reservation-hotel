@@ -4,6 +4,7 @@ import prisma from '../utils/prisma';
 import { success, error } from '../utils/response';
 import { logAudit } from '../utils/audit';
 import { sendBookingConfirmationEmail, sendBookingCancellationEmail } from '../utils/email';
+import { notify } from '../utils/notify';
 
 const PLATFORM_COMMISSION = 0.10;
 
@@ -109,6 +110,14 @@ export async function createBooking(req: Request, res: Response) {
 
   await logAudit({ userId: req.user!.id, action: 'BOOKING', entity: 'Booking', entityId: booking.id, req });
 
+  await notify(
+    price.property.ownerId,
+    'BOOKING_REQUEST',
+    'Nouvelle demande de réservation',
+    `${booking.user.firstName} a réservé "${booking.property.title}" pour ${price.nights} nuit(s).`,
+    { bookingId: booking.id },
+  );
+
   if (price.property.instantBooking) {
     try {
       await sendBookingConfirmationEmail(booking.user.email, {
@@ -123,6 +132,13 @@ export async function createBooking(req: Request, res: Response) {
     } catch {
       // email failure must not block response
     }
+    await notify(
+      req.user!.id,
+      'BOOKING_CONFIRMED',
+      'Réservation confirmée',
+      `Votre réservation pour "${booking.property.title}" est confirmée.`,
+      { bookingId: booking.id },
+    );
   }
 
   return success(res, booking, 201);
@@ -220,6 +236,14 @@ export async function confirmBooking(req: Request, res: Response) {
     });
   } catch { /* email failure must not block */ }
 
+  await notify(
+    booking.userId,
+    'BOOKING_CONFIRMED',
+    'Réservation confirmée',
+    `Votre réservation pour "${booking.property.title}" a été confirmée par le propriétaire.`,
+    { bookingId: id },
+  );
+
   await logAudit({ userId: req.user!.id, action: 'UPDATE', entity: 'Booking', entityId: id, req });
   return success(res, { message: 'Réservation confirmée.' });
 }
@@ -258,6 +282,85 @@ export async function cancelBooking(req: Request, res: Response) {
     });
   } catch { /* email failure must not block */ }
 
+  await notify(
+    booking.userId,
+    'BOOKING_CANCELLED',
+    'Réservation annulée',
+    `Votre réservation pour "${booking.property.title}" a été annulée.`,
+    { bookingId: id, reason },
+  );
+
   await logAudit({ userId: req.user!.id, action: 'UPDATE', entity: 'Booking', entityId: id, req });
   return success(res, { message: 'Réservation annulée.' });
+}
+
+export async function createDispute(req: Request, res: Response) {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  const booking = await prisma.booking.findUnique({
+    where: { id },
+    include: { property: { select: { ownerId: true, title: true } } },
+  });
+
+  if (!booking) return error(res, 'Réservation introuvable', 404);
+  if (booking.userId !== req.user!.id) return error(res, 'Accès refusé', 403);
+  if (!['CONFIRMED', 'COMPLETED'].includes(booking.status)) {
+    return error(res, 'Seules les réservations confirmées peuvent faire l\'objet d\'un litige', 400);
+  }
+
+  await prisma.booking.update({
+    where: { id },
+    data: { status: 'DISPUTED', disputedAt: new Date(), ownerNote: reason },
+  });
+
+  await notify(
+    booking.property.ownerId,
+    'SYSTEM',
+    'Litige ouvert',
+    `Un litige a été ouvert pour la réservation #${id.slice(0, 8)}.`,
+    { bookingId: id },
+  );
+
+  await logAudit({ userId: req.user!.id, action: 'UPDATE', entity: 'Booking', entityId: id, newValue: { status: 'DISPUTED', reason }, req });
+  return success(res, { message: 'Litige ouvert. Notre équipe vous contactera sous 48h.' });
+}
+
+export async function resolveDispute(req: Request, res: Response) {
+  const { id } = req.params;
+  const { resolution, status } = req.body;
+
+  if (!['CONFIRMED', 'CANCELLED_BY_ADMIN', 'COMPLETED'].includes(status)) {
+    return error(res, 'Statut de résolution invalide', 400);
+  }
+
+  const booking = await prisma.booking.findUnique({ where: { id } });
+  if (!booking) return error(res, 'Réservation introuvable', 404);
+  if (booking.status !== 'DISPUTED') return error(res, 'Cette réservation n\'est pas en litige', 400);
+
+  await prisma.booking.update({
+    where: { id },
+    data: { status, ownerNote: resolution },
+  });
+
+  await notify(booking.userId, 'SYSTEM', 'Litige résolu', `Votre litige pour la réservation #${id.slice(0, 8)} a été résolu.`, { bookingId: id });
+
+  await logAudit({ userId: req.user!.id, action: 'UPDATE', entity: 'Booking', entityId: id, newValue: { status, resolution }, req });
+  return success(res, { message: 'Litige résolu.' });
+}
+
+export async function autoCompleteBookings(_req: Request, res: Response) {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(23, 59, 59, 999);
+
+  const result = await prisma.booking.updateMany({
+    where: {
+      status: 'CONFIRMED',
+      checkOut: { lte: yesterday },
+    },
+    data: { status: 'COMPLETED', completedAt: new Date() },
+  });
+
+  return success(res, { message: `${result.count} réservation(s) marquée(s) comme terminée(s).`, count: result.count });
 }

@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import prisma from '../utils/prisma';
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
+import { signAccessToken, signRefreshToken, verifyRefreshToken, signEmailToken, verifyEmailToken } from '../utils/jwt';
 import { success, error } from '../utils/response';
 import { logAudit } from '../utils/audit';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email';
@@ -16,7 +16,6 @@ export async function register(req: Request, res: Response) {
   if (existing) return error(res, 'Cet email est déjà utilisé', 409);
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const verificationToken = uuidv4();
 
   const allowedRoles = ['USER', 'OWNER'];
   const assignedRole = allowedRoles.includes(role) ? role : 'USER';
@@ -34,6 +33,7 @@ export async function register(req: Request, res: Response) {
   });
 
   try {
+    const verificationToken = signEmailToken({ id: user.id, purpose: 'email-verify' });
     await sendVerificationEmail(email, verificationToken);
   } catch {
     // email failure must not block registration
@@ -160,6 +160,45 @@ export async function changePassword(req: Request, res: Response) {
   await logAudit({ userId: user.id, action: 'UPDATE', entity: 'User', entityId: user.id, req });
 
   return success(res, { message: 'Mot de passe modifié avec succès.' });
+}
+
+export async function verifyEmail(req: Request, res: Response) {
+  const { token } = req.body;
+  if (!token) return error(res, 'Token manquant', 400);
+
+  try {
+    const payload = verifyEmailToken(token);
+    if (payload.purpose !== 'email-verify') return error(res, 'Token invalide', 400);
+
+    const user = await prisma.user.findUnique({ where: { id: payload.id } });
+    if (!user) return error(res, 'Utilisateur introuvable', 404);
+    if (user.isVerified) return success(res, { message: 'Email déjà vérifié.' });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { isVerified: true, emailVerifiedAt: new Date() },
+    });
+    await logAudit({ userId: user.id, action: 'VERIFY', entity: 'User', entityId: user.id, req });
+
+    return success(res, { message: 'Email vérifié avec succès.' });
+  } catch {
+    return error(res, 'Token invalide ou expiré', 400);
+  }
+}
+
+export async function resendVerification(req: Request, res: Response) {
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+  if (!user) return error(res, 'Utilisateur introuvable', 404);
+  if (user.isVerified) return success(res, { message: 'Email déjà vérifié.' });
+
+  try {
+    const verificationToken = signEmailToken({ id: user.id, purpose: 'email-verify' });
+    await sendVerificationEmail(user.email, verificationToken);
+  } catch {
+    // email failure must not block
+  }
+
+  return success(res, { message: 'Email de vérification renvoyé.' });
 }
 
 export async function setup2FA(req: Request, res: Response) {

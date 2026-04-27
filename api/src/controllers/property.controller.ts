@@ -127,9 +127,21 @@ export async function updateProperty(req: Request, res: Response) {
     return error(res, 'Accès refusé', 403);
   }
 
+  const {
+    title, description, type, address, city, district, latitude, longitude,
+    maxGuests, bedrooms, bathrooms, pricePerNight, cleaningFee, serviceFee,
+    minNights, maxNights, checkInTime, checkOutTime, instantBooking,
+    cancellationPolicy, rules, amenities,
+  } = req.body;
+
   const updated = await prisma.property.update({
     where: { id },
-    data: { ...req.body, updatedAt: new Date() },
+    data: {
+      title, description, type, address, city, district, latitude, longitude,
+      maxGuests, bedrooms, bathrooms, pricePerNight, cleaningFee, serviceFee,
+      minNights, maxNights, checkInTime, checkOutTime, instantBooking,
+      cancellationPolicy, rules, amenities, updatedAt: new Date(),
+    },
   });
 
   await logAudit({ userId: req.user!.id, action: 'UPDATE', entity: 'Property', entityId: id, req });

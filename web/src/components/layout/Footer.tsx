@@ -1,42 +1,123 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Facebook, Instagram, Twitter, Phone, Mail, MapPin } from 'lucide-react';
+import { Home, Facebook, Instagram, Twitter, Phone, Mail, MapPin, Send, ArrowRight } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+const CITIES = ['Dakar', 'Saly', 'Saint-Louis', 'Somone', 'Cap Skirring', 'Ziguinchor'];
 
 export default function Footer() {
+  const [email, setEmail] = useState('');
+
+  const handleNewsletter = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email) {
+      toast.success('Merci ! Vous recevrez nos meilleures offres.');
+      setEmail('');
+    }
+  };
+
   return (
-    <footer className="bg-gray-900 text-gray-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+    <footer className="bg-dark-900 text-gray-400">
+      {/* Newsletter bar */}
+      <div className="border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div>
+              <h3 className="text-white font-display font-bold text-xl mb-1">
+                Offres exclusives &amp; bons plans
+              </h3>
+              <p className="text-gray-500 text-sm">
+                Recevez nos meilleures adresses et promotions en avant-première.
+              </p>
+            </div>
+            <form onSubmit={handleNewsletter} className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:w-72">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="votre@email.com"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-primary-500 transition-colors"
+                />
+              </div>
+              <button
+                type="submit"
+                className="flex-shrink-0 bg-primary-600 hover:bg-primary-500 text-white px-5 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                <span className="hidden sm:inline">S'abonner</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {/* Main grid */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
           {/* Brand */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+          <div className="lg:col-span-2 space-y-5">
+            <Link to="/" className="flex items-center gap-2.5">
+              <div className="w-9 h-9 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center shadow-sm">
                 <Home className="w-5 h-5 text-white" />
               </div>
-              <span className="font-bold text-white text-lg">Séjour Sénégal</span>
-            </div>
-            <p className="text-sm text-gray-400 leading-relaxed">
-              La plateforme premium de réservation d'hébergements au Sénégal. Vivez votre séjour africain authentique.
+              <span className="font-display font-bold text-white text-lg">
+                Séjour <span className="text-primary-500">Sénégal</span>
+              </span>
+            </Link>
+            <p className="text-sm text-gray-500 leading-relaxed max-w-xs">
+              La plateforme premium de réservation d'hébergements au Sénégal.
+              Villas, appartements, maisons de caractère — vivez l'Afrique authentique.
             </p>
-            <div className="flex gap-3">
-              <a href="#" className="p-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">
-                <Facebook className="w-4 h-4" />
-              </a>
-              <a href="#" className="p-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">
-                <Instagram className="w-4 h-4" />
-              </a>
-              <a href="#" className="p-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">
-                <Twitter className="w-4 h-4" />
-              </a>
+
+            {/* Social */}
+            <div className="flex gap-2.5">
+              {[
+                { Icon: Facebook, label: 'Facebook' },
+                { Icon: Instagram, label: 'Instagram' },
+                { Icon: Twitter, label: 'Twitter' },
+              ].map(({ Icon, label }) => (
+                <a
+                  key={label}
+                  href="#"
+                  aria-label={label}
+                  className="w-9 h-9 bg-white/5 hover:bg-primary-600 border border-white/10 hover:border-primary-500 rounded-xl flex items-center justify-center transition-all duration-200"
+                >
+                  <Icon className="w-4 h-4" />
+                </a>
+              ))}
+            </div>
+
+            {/* Payment badges */}
+            <div>
+              <p className="text-xs text-gray-600 mb-2 uppercase tracking-wider font-medium">Paiements acceptés</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                {['Visa', 'MasterCard', 'Orange Money', 'Wave', 'PayTech'].map(pm => (
+                  <span
+                    key={pm}
+                    className="text-[10px] font-bold text-gray-500 border border-white/10 bg-white/5 px-2 py-1 rounded-md"
+                  >
+                    {pm}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Explorer */}
+          {/* Destinations */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Explorer</h4>
-            <ul className="space-y-2 text-sm">
-              {['Dakar', 'Saly', 'Saint-Louis', 'Somone', 'Cap Skirring', 'Ziguinchor'].map(city => (
+            <h4 className="text-white font-semibold mb-5 text-sm uppercase tracking-widest">Destinations</h4>
+            <ul className="space-y-2.5 text-sm">
+              {CITIES.map(city => (
                 <li key={city}>
-                  <Link to={`/recherche?city=${city}`} className="hover:text-white transition-colors">{city}</Link>
+                  <Link
+                    to={`/recherche?city=${city}`}
+                    className="flex items-center gap-2 hover:text-white transition-colors group"
+                  >
+                    <ArrowRight className="w-3 h-3 text-primary-600 opacity-0 group-hover:opacity-100 -ml-5 group-hover:ml-0 transition-all duration-200" />
+                    {city}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -44,42 +125,63 @@ export default function Footer() {
 
           {/* Services */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Services</h4>
-            <ul className="space-y-2 text-sm">
-              <li><Link to="/register" className="hover:text-white transition-colors">Devenir propriétaire</Link></li>
-              <li><Link to="/recherche" className="hover:text-white transition-colors">Trouver un logement</Link></li>
-              <li><a href="#" className="hover:text-white transition-colors">Guide voyage</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Options premium</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Aide & Support</a></li>
+            <h4 className="text-white font-semibold mb-5 text-sm uppercase tracking-widest">Services</h4>
+            <ul className="space-y-2.5 text-sm">
+              {[
+                { label: 'Devenir propriétaire', to: '/register' },
+                { label: 'Trouver un logement', to: '/recherche' },
+                { label: 'Mon espace', to: '/dashboard' },
+                { label: 'Aide & Support', to: '#' },
+                { label: 'Guide du voyageur', to: '#' },
+              ].map(({ label, to }) => (
+                <li key={label}>
+                  <Link
+                    to={to}
+                    className="flex items-center gap-2 hover:text-white transition-colors group"
+                  >
+                    <ArrowRight className="w-3 h-3 text-primary-600 opacity-0 group-hover:opacity-100 -ml-5 group-hover:ml-0 transition-all duration-200" />
+                    {label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
           {/* Contact */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Contact</h4>
-            <ul className="space-y-3 text-sm">
-              <li className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-primary-500 flex-shrink-0" />
-                <span>Dakar, Sénégal</span>
+            <h4 className="text-white font-semibold mb-5 text-sm uppercase tracking-widest">Contact</h4>
+            <ul className="space-y-3.5 text-sm">
+              <li className="flex items-start gap-3">
+                <MapPin className="w-4 h-4 text-primary-500 flex-shrink-0 mt-0.5" />
+                <span>Plateau, Dakar<br />Sénégal</span>
               </li>
-              <li className="flex items-center gap-2">
+              <li className="flex items-center gap-3">
                 <Phone className="w-4 h-4 text-primary-500 flex-shrink-0" />
-                <a href="tel:+221338006000" className="hover:text-white transition-colors">+221 33 800 60 00</a>
+                <a href="tel:+221338006000" className="hover:text-white transition-colors">
+                  +221 33 800 60 00
+                </a>
               </li>
-              <li className="flex items-center gap-2">
+              <li className="flex items-center gap-3">
                 <Mail className="w-4 h-4 text-primary-500 flex-shrink-0" />
-                <a href="mailto:hello@sejoursenegal.sn" className="hover:text-white transition-colors">hello@sejoursenegal.sn</a>
+                <a href="mailto:hello@sejoursenegal.sn" className="hover:text-white transition-colors">
+                  hello@sejoursenegal.sn
+                </a>
               </li>
             </ul>
           </div>
         </div>
+      </div>
 
-        <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500">
+      {/* Bottom bar */}
+      <div className="border-t border-white/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-gray-600">
           <p>© 2025 Séjour Sénégal. Tous droits réservés.</p>
-          <div className="flex gap-4">
-            <a href="#" className="hover:text-gray-300 transition-colors">Confidentialité</a>
-            <a href="#" className="hover:text-gray-300 transition-colors">CGU</a>
-            <a href="#" className="hover:text-gray-300 transition-colors">Cookies</a>
+          <div className="flex items-center gap-5">
+            {['Confidentialité', 'CGU', 'Cookies', 'Mentions légales'].map(link => (
+              <a key={link} href="#" className="hover:text-gray-400 transition-colors">
+                {link}
+              </a>
+            ))}
           </div>
         </div>
       </div>

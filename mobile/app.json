@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Séjour Sénégal",
+    "slug": "sejour-senegal",
+    "version": "1.0.0",
+    "scheme": "sejoursenegal",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#d97706"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "sn.sejoursenegal.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#d97706"
+      },
+      "package": "sn.sejoursenegal.app",
+      "edgeToEdgeEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
